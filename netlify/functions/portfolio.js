@@ -1,5 +1,5 @@
 const express = require("express");
-const Portfolio = require("../models/Portfolio");
+const Portfolio = require("../../models/Portfolio");
 const User = require("../models/User");
 const authMiddleware = require("../../middleware/authMiddleware");
 
