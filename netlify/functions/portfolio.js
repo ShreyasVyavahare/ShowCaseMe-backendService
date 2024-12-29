@@ -1,9 +1,15 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const Portfolio = require("../../models/Portfolio");
 const User = require("../../models/User");
 const authMiddleware = require("../../middleware/authMiddleware");
+const serverless = require("serverless-http");
 
+const app = express();
 const router = express.Router();
+
+// Middleware
+app.use(express.json());
 
 // Create or Update Portfolio
 router.post("/", authMiddleware, async (req, res) => {
@@ -103,4 +109,6 @@ router.get("/:username", async (req, res) => {
     }
 });
 
-module.exports = router;
+app.use("/.netlify/functions/portfolio", router);
+
+module.exports.handler = serverless(app);

@@ -3,8 +3,13 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../../models/User");
 const authMiddleware = require("../../middleware/authMiddleware");
+const serverless = require("serverless-http");
 
+const app = express();
 const router = express.Router();
+
+// Middleware
+app.use(express.json());
 
 // Register User
 router.post("/signup", async (req, res) => {
@@ -88,4 +93,6 @@ router.get("/verify", async (req, res) => {
     }
 });
 
-module.exports = router;
+app.use("/.netlify/functions/auth", router);
+
+module.exports.handler = serverless(app);
