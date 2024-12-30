@@ -1,6 +1,11 @@
+// netlify.toml
 [build]
   functions = "netlify/functions"
-  publish = "public"
 
-[functions]
-  node_bundler = "esbuild"
+[[edge_functions]]
+  function = "auth"
+  path = "/auth/*"
+
+[[edge_functions]]
+  function = "portfolio"
+  path = "/portfolio/*"

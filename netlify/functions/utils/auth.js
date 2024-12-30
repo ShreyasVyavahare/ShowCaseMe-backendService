@@ -42,7 +42,8 @@ exports.handler = async (event, context) => {
 
         if (method === "POST" && path === "login") {
             const { email, password } = JSON.parse(event.body);
-            const user = await User.findOne({ email });
+            // const user = await User.findOne({ email });
+            const user = await User.findOne({ email }).select('email username password');
             
             if (!user) {
                 return {

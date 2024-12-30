@@ -1,15 +1,22 @@
 // netlify/functions/utils/db.js
 const mongoose = require("mongoose");
-let conn = null;
+
+let cachedDb = null;
 
 const connectDB = async () => {
-    if (conn == null) {
-        conn = await mongoose.connect(process.env.MONGO_URI, {
-            serverSelectionTimeoutMS: 5000
-        });
-        return conn;
+    if (cachedDb) {
+        return cachedDb;
     }
-    return conn;
+
+    const db = await mongoose.connect(process.env.MONGO_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 5000
+    });
+
+    cachedDb = db;
+    return db;
 };
 
 module.exports = connectDB;

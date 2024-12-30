@@ -6,9 +6,9 @@ const connectDB = require("./utils/db");
 
 // Define User Schema
 const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    username: { type: String, required: true, unique: true, index: true },
+    email: { type: String, required: true, unique: true, index: true },
+    password: { type: String, required: true }
 });
 
 UserSchema.pre("save", async function (next) {
@@ -32,9 +32,12 @@ const verifyToken = (authHeader) => {
 
 exports.handler = async (event, context) => {
     context.callbackWaitsForEmptyEventLoop = false;
+    if (!mongoose.connection.readyState) {
+        await connectDB();
+    }
     
     try {
-        await connectDB();
+  
         
         const path = event.path.replace("/.netlify/functions/auth/", "");
         const method = event.httpMethod;
@@ -58,7 +61,8 @@ exports.handler = async (event, context) => {
         // Login Route
         if (method === "POST" && path === "login") {
             const { email, password } = JSON.parse(event.body);
-            const user = await User.findOne({ email });
+            // const user = await User.findOne({ email });
+            const user = await User.findOne({ email }).select('email username password');
             
             if (!user) {
                 return {

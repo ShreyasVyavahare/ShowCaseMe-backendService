@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 
 // Define Portfolio Schema
 const PortfolioSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     personalDetails: { type: Object, required: true },
     skills: [String],
     experience: [Object],
@@ -43,9 +43,13 @@ const verifyToken = (authHeader) => {
 
 exports.handler = async (event, context) => {
     context.callbackWaitsForEmptyEventLoop = false;
+    if (!mongoose.connection.readyState) {
+        await connectDB();
+    }
+    
 
     try {
-        await connectDB();
+       
 
         const path = event.path.replace("/.netlify/functions/portfolio/", "");
         const method = event.httpMethod;
