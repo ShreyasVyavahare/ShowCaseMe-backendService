@@ -1,98 +1,171 @@
-const express = require("express");
+// netlify/functions/auth.js
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const User = require("../../models/User");
-const authMiddleware = require("../../middleware/authMiddleware");
-const serverless = require("serverless-http");
+const connectDB = require("./utils/db");
 
-const app = express();
-const router = express.Router();
-
-// Middleware
-app.use(express.json());
-
-// Register User
-router.post("/signup", async (req, res) => {
-    const { username, email, password } = req.body;
-
-    if (!username || !email || !password) {
-        return res.status(400).json({ message: "All fields are required" });
-    }
-
-    try {
-        // Check if email or username already exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: "Email is already in use" });
-        }
-
-        const user = new User({ username, email, password });
-        await user.save();
-
-        res.status(201).json({ message: "User registered successfully" });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Server error" });
-    }
+// Define User Schema
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
 });
 
-// Login User
-router.post("/login", async (req, res) => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-    }
-
-    try {
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: "Invalid credentials" });
-        }
-
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-        res.json({ token, user: { id: user._id, username: user.username, email: user.email } });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Server error" });
-    }
+UserSchema.pre("save", async function (next) {
+    if (!this.isModified("password")) return next();
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
 });
 
-// Get Authenticated User
-router.get("/user", authMiddleware, async (req, res) => {
+const User = mongoose.model("User", UserSchema);
+
+// Verify token middleware function
+const verifyToken = (authHeader) => {
+    if (!authHeader) {
+        throw new Error("No token provided");
+    }
+    
+    const token = authHeader.replace("Bearer ", "");
+    return jwt.verify(token, process.env.JWT_SECRET);
+};
+
+exports.handler = async (event, context) => {
+    context.callbackWaitsForEmptyEventLoop = false;
+    
     try {
-        const user = await User.findById(req.user.id).select("-password");
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
+        await connectDB();
+        
+        const path = event.path.replace("/.netlify/functions/auth/", "");
+        const method = event.httpMethod;
+
+        // Signup Route
+        if (method === "POST" && path === "signup") {
+            const { username, email, password } = JSON.parse(event.body);
+            const user = new User({ username, email, password });
+            await user.save();
+            
+            return {
+                statusCode: 201,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify({ message: "User registered successfully" })
+            };
         }
-        res.json({ username: user.username, email: user.email });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Server error" });
+
+        // Login Route
+        if (method === "POST" && path === "login") {
+            const { email, password } = JSON.parse(event.body);
+            const user = await User.findOne({ email });
+            
+            if (!user) {
+                return {
+                    statusCode: 404,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*"
+                    },
+                    body: JSON.stringify({ message: "User not found" })
+                };
+            }
+
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return {
+                    statusCode: 400,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*"
+                    },
+                    body: JSON.stringify({ message: "Invalid credentials" })
+                };
+            }
+
+            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+            
+            return {
+                statusCode: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify({
+                    token,
+                    user: { id: user._id, username: user.username, email: user.email }
+                })
+            };
+        }
+
+        // Verify Token Route
+        if (method === "GET" && path === "verify") {
+            const decoded = verifyToken(event.headers.authorization);
+            return {
+                statusCode: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify(decoded)
+            };
+        }
+
+        // Get User Route
+        if (method === "GET" && path === "user") {
+            const decoded = verifyToken(event.headers.authorization);
+            const user = await User.findById(decoded.id).select("-password");
+            
+            if (!user) {
+                return {
+                    statusCode: 404,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*"
+                    },
+                    body: JSON.stringify({ message: "User not found" })
+                };
+            }
+
+            return {
+                statusCode: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify({ username: user.username, email: user.email })
+            };
+        }
+
+        // Handle OPTIONS request for CORS
+        if (method === "OPTIONS") {
+            return {
+                statusCode: 200,
+                headers: {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+                },
+                body: ""
+            };
+        }
+
+        return {
+            statusCode: 404,
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            body: JSON.stringify({ message: "Route not found" })
+        };
+    } catch (error) {
+        return {
+            statusCode: 500,
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            body: JSON.stringify({ error: error.message })
+        };
     }
-});
-
-// Verify Token
-router.get("/verify", async (req, res) => {
-    const token = req.header("x-auth-token");
-
-    if (!token) {
-        return res.status(401).json({ message: "No token, authorization denied" });
-    }
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        res.json(decoded);
-    } catch (err) {
-        res.status(400).json({ message: "Token is not valid" });
-    }
-});
-
-app.use("/.netlify/functions/auth", router);
-
-module.exports.handler = serverless(app);
+};
