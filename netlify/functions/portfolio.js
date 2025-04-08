@@ -4,7 +4,6 @@ const mongoose = require("mongoose");
 const connectDB = require("./utils/db");
 const jwt = require("jsonwebtoken");
 
-// Define Portfolio Schema
 const PortfolioSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     personalDetails: { type: Object, required: true },
