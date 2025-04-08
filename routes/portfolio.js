@@ -9,6 +9,65 @@ const router = express.Router();
 
 
 // portfolioRoute.js
+// router.post('/upload', authMiddleware, multerUpload.fields([
+//   { name: 'profileImageURL', maxCount: 1 },
+//   { name: 'projectImages', maxCount: 5 }
+// ]), async (req, res) => {
+//   try {
+//     // Find the user's portfolio
+//     let portfolio = await Portfolio.findOne({ user: req.user.id });
+
+//     // If no portfolio exists, create a new one
+//     if (!portfolio) {
+//       portfolio = new Portfolio({
+//         user: req.user.id,
+//         personalDetails: {}, // Initialize personalDetails
+//         projects: [] // Initialize projects array
+//       });
+//     }
+
+//     // Ensure personalDetails is initialized
+//     portfolio.personalDetails = portfolio.personalDetails || {};
+
+//     // Process profile image
+//     if (req.files?.profileImageURL) {
+//       const file = req.files.profileImageURL[0];
+//       const profileImageURL = await uploadToS3(file, 'profiles');
+//       portfolio.personalDetails.profileImageURL = profileImageURL; // Set or replace profileImageURL
+//     }
+
+//     // Process project images
+//     if (req.files?.projectImages) {
+//       const projectIndex = parseInt(req.body.projectIndex);
+//       const file = req.files.projectImages[0];
+//       const projectImageUrl = await uploadToS3(file, 'projects');
+
+//       if (!portfolio.projects) {
+//         portfolio.projects = [];
+//       }
+
+//       if (!isNaN(projectIndex) && projectIndex >= 0 && projectIndex < portfolio.projects.length) {
+//         portfolio.projects[projectIndex].projectImage = projectImageUrl;
+//       } else {
+//         return res.status(400).json({
+//           error: 'Invalid project index. Cannot add new project via image upload.'
+//         });
+//       }
+//     }
+
+//     // Save the portfolio (create or update)
+//     const updatedPortfolio = await Portfolio.findOneAndUpdate(
+//       { user: req.user.id },
+//       portfolio,
+//       { new: true, upsert: true } // upsert: true creates a new document if none exists
+//     );
+
+//     res.json(updatedPortfolio);
+//   } catch (err) {
+//     console.error('Upload error:', err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 router.post('/upload', authMiddleware, multerUpload.fields([
   { name: 'profileImageURL', maxCount: 1 },
   { name: 'projectImages', maxCount: 5 }
@@ -47,10 +106,14 @@ router.post('/upload', authMiddleware, multerUpload.fields([
       }
 
       if (!isNaN(projectIndex) && projectIndex >= 0 && projectIndex < portfolio.projects.length) {
+        // Update the project at the specified index
         portfolio.projects[projectIndex].projectImage = projectImageUrl;
       } else {
-        return res.status(400).json({
-          error: 'Invalid project index. Cannot add new project via image upload.'
+        // Add a new project if the index is invalid or not provided
+        portfolio.projects.push({
+          title: req.body.projectTitle || 'Untitled Project',
+          description: req.body.projectDescription || '',
+          projectImage: projectImageUrl
         });
       }
     }
