@@ -75,7 +75,8 @@ exports.handler = async (event, context) => {
             statusCode: 404,
             body: JSON.stringify({ message: "Route not found" })
         };
-    } catch (error) {
+    } 
+    catch (error) {
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message })

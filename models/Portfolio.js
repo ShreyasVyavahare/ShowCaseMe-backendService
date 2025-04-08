@@ -11,6 +11,7 @@ const PortfolioSchema = new mongoose.Schema({
     description: { type: String },
     softSkills: [String],
     languages: [String],
+    templateId: { type: String, default: null }, 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
